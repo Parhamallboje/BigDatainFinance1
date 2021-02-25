@@ -33,8 +33,8 @@ def extend_variables(no,x_small,returns,flows):
     cl_flows = flows.drop([no], axis=1)
     cl_returns.columns = [f"{s}_RETURNS_LAG_1" for s in cl_returns.columns]
     cl_flows.columns = [f"{s}_FLOWS_LAG_1"   for s in cl_flows.columns]
-    x_small[cl_returns.columns]  = cl_returns
-    x_small[cl_flows.columns]  = cl_flows
+    x_small[cl_returns.columns]  = cl_returns.shift(1)
+    x_small[cl_flows.columns]  = cl_flows.shift(1)
     return x_small
 
 
