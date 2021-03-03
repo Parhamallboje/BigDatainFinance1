@@ -99,23 +99,23 @@ def add_features(df):
     """
     df['SMA5'] = df["RETURNS"].rolling(5).mean()
     df['SMA5_VOL'] = df["RETURNS"].rolling(5).std()
-    df["UPPER_BOL_5"] = df['SMA5'] + df['SMA5'] ** 2  
-    df["LOWER_BOL_5"] = df['SMA5'] - df['SMA5']  
+    df["UPPER_BOL_5"] = df['SMA5'] + df['SMA5_VOL'] ** 2
+    df["LOWER_BOL_5"] = df['SMA5'] - df['SMA5_VOL'] ** 2
     
     df['SMA10'] = df["RETURNS"].rolling(10).mean()
     df['SMA10_VOL'] = df["RETURNS"].rolling(10).std()
-    df["UPPER_BOL_10"] = df['SMA10'] + df['SMA10'] ** 2  
-    df["LOWER_BOL_10"] = df['SMA10'] - df['SMA10']  
+    df["UPPER_BOL_10"] = df['SMA10'] + df['SMA10_VOL'] ** 2
+    df["LOWER_BOL_10"] = df['SMA10'] - df['SMA10_VOL'] ** 2
 
     df['SMA25'] = df["RETURNS"].rolling(25).mean()
     df['SMA25_VOL'] = df["RETURNS"].rolling(25).std()
-    df["UPPER_BOL_25"] = df['SMA25'] + df['SMA25'] ** 2  
-    df["LOWER_BOL_25"] = df['SMA25'] - df['SMA25']  
+    df["UPPER_BOL_25"] = df['SMA25'] + df['SMA25_VOL'] ** 2
+    df["LOWER_BOL_25"] = df['SMA25'] - df['SMA25_VOL'] ** 2
 
     df['SMA50'] = df["RETURNS"].rolling(50).mean()
     df['SMA50_VOL'] = df["RETURNS"].rolling(50).std()
-    df["UPPER_BOL_50"] = df['SMA50'] + df['SMA50'] ** 2  
-    df["LOWER_BOL_50"] = df['SMA50'] - df['SMA50']
+    df["UPPER_BOL_50"] = df['SMA50'] + df['SMA50_VOL'] ** 2
+    df["LOWER_BOL_50"] = df['SMA50'] - df['SMA50_VOL'] ** 2
     df.dropna(inplace=True)
     return df
 
