@@ -6,8 +6,8 @@ import pandas as pd
 import copy
 import numpy as np
 from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import RandomizedSearchCV
-
+from sklearn.model_selection import RandomizedSearchCV, train_test_split
+from sklearn.decomposition import PCA
 
 def create_stock_df(no, sources):
     new_df = pd.DataFrame(index=sources[0].index)
@@ -28,14 +28,34 @@ def x_y_split(df):
     y = df[['RETURNS']]
     return x,y
 
-def extend_variables(no,x_small,returns,flows):
-    cl_returns = returns.drop([no],axis=1)
-    cl_flows = flows.drop([no], axis=1)
-    cl_returns.columns = [f"{s}_RETURNS_LAG_1" for s in cl_returns.columns]
-    cl_flows.columns = [f"{s}_FLOWS_LAG_1"   for s in cl_flows.columns]
-    x_small[cl_returns.columns]  = cl_returns.shift(1)
-    x_small[cl_flows.columns]  = cl_flows.shift(1)
-    return x_small
+
+def extend_variables(no, x_small, returns, flows, pca_n_components=0):
+    cl_returns = returns.drop([no], axis=1).shift(1)
+    cl_flows = flows.drop([no], axis=1).shift(1)
+
+    if pca_n_components != 0:
+        pca = PCA(n_components=pca_n_components)
+        cl_returns.dropna(inplace=True)
+        pca_returns = pca.fit_transform(cl_returns)
+        principal_returns_df = pd.DataFrame(data=pca_returns, columns=[
+                                            f"PC_{s}_RETURNS_LAG_1" for s in range(pca_n_components)], index=cl_returns.index)
+
+        cl_flows.dropna(inplace=True)
+        pca_flows = pca.fit_transform(cl_flows)
+        principal_flows_df = pd.DataFrame(data=pca_flows, columns=[
+            f"PC_{s}_FLOWS_LAG_1" for s in range(pca_n_components)], index=cl_flows.index)
+
+        x_small[principal_flows_df.columns] = principal_flows_df
+        x_small[principal_returns_df.columns] = principal_returns_df
+        return x_small
+
+    else:
+        cl_flows.columns = [f"{s}_FLOWS_LAG_1" for s in cl_flows.columns]
+        cl_returns.columns = [f"{s}_RETURNS_LAG_1" for s in cl_returns.columns]
+        x_small[cl_returns.columns] = cl_returns
+        x_small[cl_flows.columns] = cl_flows
+
+        return x_small
 
 
 def Rolling_ML(window_size, df, model, hyperparameters={}, progession_param=0):
@@ -56,3 +76,59 @@ def Rolling_ML(window_size, df, model, hyperparameters={}, progession_param=0):
                      'PRED'] = np.array(clf.predict(df_x[j:j+step_size]))
     return stock_ML
 
+
+def Normal_ML(window_size, df, model, hyperparameters={}):
+    df_x, df_y = x_y_split(df)
+    X_train, y_train = df_x[:int(len(df_x)*0.7)], df_y[:int(len(df_y)*0.7)]
+    X_test, y_test = df_x[int(len(df_x)*0.7):], df_y[int(len(df_y)*0.7):]
+
+    if len(hyperparameters.keys()) != 0:
+        cv = RandomizedSearchCV(model, hyperparameters, random_state=0)
+        clf = cv.fit(X_train, y_train)
+    else:
+        clf = model.fit(X_train, y_train)
+
+    y_test['PRED'] = clf.predict(X_test)
+    return y_test
+
+
+
+def add_features(df):
+    """
+    Generally technical indicators.  
+    """
+    df['SMA5'] = df["RETURNS"].rolling(5).mean()
+    df['SMA5_VOL'] = df["RETURNS"].rolling(5).std()
+    df["UPPER_BOL_5"] = df['SMA5'] + df['SMA5'] ** 2  
+    df["LOWER_BOL_5"] = df['SMA5'] - df['SMA5']  
+    
+    df['SMA10'] = df["RETURNS"].rolling(10).mean()
+    df['SMA10_VOL'] = df["RETURNS"].rolling(10).std()
+    df["UPPER_BOL_10"] = df['SMA10'] + df['SMA10'] ** 2  
+    df["LOWER_BOL_10"] = df['SMA10'] - df['SMA10']  
+
+    df['SMA25'] = df["RETURNS"].rolling(25).mean()
+    df['SMA25_VOL'] = df["RETURNS"].rolling(25).std()
+    df["UPPER_BOL_25"] = df['SMA25'] + df['SMA25'] ** 2  
+    df["LOWER_BOL_25"] = df['SMA25'] - df['SMA25']  
+
+    df['SMA50'] = df["RETURNS"].rolling(50).mean()
+    df['SMA50_VOL'] = df["RETURNS"].rolling(50).std()
+    df["UPPER_BOL_50"] = df['SMA50'] + df['SMA50'] ** 2  
+    df["LOWER_BOL_50"] = df['SMA50'] - df['SMA50']
+    df.dropna(inplace=True)
+    return df
+
+
+def get_percentiles(value, tau=0.01):
+    if abs(value) > tau:
+        return np.sign(value)
+    else:
+        return 0
+
+
+def make_market_state(series: pd.Series, tau=0.01):
+    forward_sma = series.rolling(5).mean().shift(-4)
+    forward_sma.iloc[-4:] = series.iloc[-4:]
+    market_state = forward_sma.apply(get_percentiles, tau=tau)
+    return market_state
